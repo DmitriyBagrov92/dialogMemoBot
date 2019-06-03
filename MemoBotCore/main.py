@@ -2,6 +2,7 @@ from dialog_bot_sdk.bot import DialogBot
 from dialog_bot_sdk import interactive_media
 from bs4 import BeautifulSoup
 from threading import Timer,Thread,Event
+import time
 import grpc
 import os
 import json
@@ -13,7 +14,6 @@ kSubscribeActionId = "0"
 kUnsubscribeActionId = "1"
 
 memeSubscribers = {}
-lastMemeUrl = ''
 localMemePath = os.getcwd() + '/meme.jpeg'
 
 def sendPossibleActions(messageParams):
@@ -71,21 +71,31 @@ def downloadAndSaveMemeWith(url):
 def sendLastMemeTo(uid):
     peer = bot.users.get_user_outpeer_by_id(uid)
     bot.messaging.send_image(peer, localMemePath)
+    print("Meme sent to subscriber", uid)
 
 def sendMemeToSubscribersIfNeeded():
-    if isNewMemeAvailable():
-        #Download Meme and replace on disk
-        lastMemeUrl = getFreshestMemeRemoteURL()
-        downloadAndSaveMemeWith(lastMemeUrl)
-        #Calculate subscriber ids
-        print(memeSubscribers)
-        onlySubscribed = { k:v for k,v in memeSubscribers.items() if v }
-        subscribersUids = onlySubscribed.keys()
-        for uid in subscribersUids:
-            sendLastMemeTo(uid)
+    print("Checking for new Meme...")
+    while True:
+        if isNewMemeAvailable():
+            print("New Meme Available, send to subscribers...")
+            #Download Meme and replace on disk
+            global lastMemeUrl
+            lastMemeUrl = getFreshestMemeRemoteURL()
+            downloadAndSaveMemeWith(lastMemeUrl)
+            #Calculate subscriber ids
+            print(memeSubscribers)
+            onlySubscribed = { k:v for k,v in memeSubscribers.items() if v }
+            subscribersUids = onlySubscribed.keys()
+            for uid in subscribersUids:
+               sendLastMemeTo(uid)
+        else:
+            print("New meme is not available=(")
+        time.sleep(kPullingTimeInterval)
 
 def isNewMemeAvailable():
-    return getFreshestMemeRemoteURL() != lastMemeUrl
+    newMemeUrl = getFreshestMemeRemoteURL()
+    print("previous = ", lastMemeUrl)
+    return newMemeUrl != lastMemeUrl
 
 if __name__ == '__main__':
     bot = DialogBot.get_secure_bot(
@@ -94,7 +104,9 @@ if __name__ == '__main__':
         'd316f092920d1badf7a3381697419ff89029f9f2'  # bot token from environment
     )
 
-    memePullingTimer = Timer(kPullingTimeInterval, sendMemeToSubscribersIfNeeded)
-    memePullingTimer.start()
+    memePullingThread = Thread(target=sendMemeToSubscribersIfNeeded)
+    memePullingThread.start()
+
+    lastMemeUrl = ""
 
     bot.messaging.on_message(checkAndPresentActionsIfNeeded, onActionTap)
