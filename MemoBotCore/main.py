@@ -8,15 +8,15 @@ import os
 import json
 import requests
 
-kBotNick = '@memobot'
-kPullingTimeInterval = 10
-kSubscribeActionId = "0"
-kUnsubscribeActionId = "1"
+k_bot_nick = '@memobot'
+k_pulling_interval = 30
+k_subscribe_action_id = "0"
+k_unsubscribe_action_id = "1"
 
-memeSubscribers = {}
-localMemePath = os.getcwd() + '/meme.jpeg'
+meme_subscribers = {}
+local_meme_path = os.getcwd() + '/meme.jpeg'
 
-def sendPossibleActions(messageParams):
+def send_possible_actions(messageParams):
     print('present possible actions for', messageParams)
     bot.messaging.send_message(
         messageParams[0].peer,
@@ -24,33 +24,33 @@ def sendPossibleActions(messageParams):
         [interactive_media.InteractiveMediaGroup(
             [
                 interactive_media.InteractiveMedia(
-                    kSubscribeActionId,
+                    k_subscribe_action_id,
                     interactive_media.InteractiveMediaButton("Подписаться на Мемы", "Подписаться на Мемы")
                 ),
                 interactive_media.InteractiveMedia(
-                    kUnsubscribeActionId,
+                    k_unsubscribe_action_id,
                     interactive_media.InteractiveMediaButton("Отписаться", "Отписаться")
                 ),
             ]
         )]
     )
 
-def checkAndPresentActionsIfNeeded(*message):
+def check_and_present_actions_if_needed(*message):
     textMessage = message[0].message.textMessage.text
-    if kBotNick in textMessage:
-        sendPossibleActions(message)
+    if k_bot_nick in textMessage:
+        send_possible_actions(message)
 
-def onActionTap(actionParams):
+def on_action_tap(actionParams):
     print('on action tap for', actionParams)
-    if actionParams.id == kSubscribeActionId:
+    if actionParams.id == k_subscribe_action_id:
         #TODO: send successfuly subscribed message
-        memeSubscribers[actionParams.uid] = True
-        sendLastMemeTo(actionParams.uid)
+        meme_subscribers[actionParams.uid] = True
+        send_last_meme_to(actionParams.uid)
     else:
         #TODO: send successfuly unsubscribed message
-        memeSubscribers[actionParams.uid] = False
+        meme_subscribers[actionParams.uid] = False
 
-def getFreshestMemeRemoteURL():
+def get_freshest_meme_remote_URL():
     sourceUrl = 'https://pikabu.ru/tag/Мемы?n=4'
     response = requests.get(sourceUrl)
     soup = BeautifulSoup(response.content, "html.parser")
@@ -59,54 +59,54 @@ def getFreshestMemeRemoteURL():
     memeImgAttrsSet = firstMemeDiv.findNext("img")
     return memeImgAttrsSet.attrs['src']
 
-def downloadAndSaveMemeWith(url):
+def download_and_save_meme_with(url):
     response = requests.get(url)
     if response.ok:
-        file = open(localMemePath, "wb+")  # write, binary, allow creation
+        file = open(local_meme_path, "wb+")  # write, binary, allow creation
         file.write(response.content)
         file.close()
     else:
         print("Failed to get the file")
 
-def sendLastMemeTo(uid):
+def send_last_meme_to(uid):
     peer = bot.users.get_user_outpeer_by_id(uid)
-    bot.messaging.send_image(peer, localMemePath)
+    bot.messaging.send_image(peer, local_meme_path)
     print("Meme sent to subscriber", uid)
 
-def sendMemeToSubscribersIfNeeded():
+def send_meme_to_subscribers_if_needed():
     print("Checking for new Meme...")
     while True:
-        if isNewMemeAvailable():
+        if is_new_meme_available():
             print("New Meme Available, send to subscribers...")
             #Download Meme and replace on disk
             global lastMemeUrl
-            lastMemeUrl = getFreshestMemeRemoteURL()
-            downloadAndSaveMemeWith(lastMemeUrl)
+            lastMemeUrl = get_freshest_meme_remote_URL()
+            download_and_save_meme_with(lastMemeUrl)
             #Calculate subscriber ids
-            print(memeSubscribers)
-            onlySubscribed = { k:v for k,v in memeSubscribers.items() if v }
+            print(meme_subscribers)
+            onlySubscribed = { k:v for k,v in meme_subscribers.items() if v }
             subscribersUids = onlySubscribed.keys()
             for uid in subscribersUids:
-               sendLastMemeTo(uid)
+               send_last_meme_to(uid)
         else:
             print("New meme is not available=(")
-        time.sleep(kPullingTimeInterval)
+        time.sleep(k_pulling_interval)
 
-def isNewMemeAvailable():
-    newMemeUrl = getFreshestMemeRemoteURL()
+def is_new_meme_available():
+    newMemeUrl = get_freshest_meme_remote_URL()
     print("previous = ", lastMemeUrl)
     return newMemeUrl != lastMemeUrl
 
 if __name__ == '__main__':
     bot = DialogBot.get_secure_bot(
-        'epm.dlg.im:443',  # bot endpoint from environment
+        os.environ.get('BOT_ENDPOINT'),  # bot endpoint from environment
         grpc.ssl_channel_credentials(), # SSL credentials (empty by default!)
-        'd316f092920d1badf7a3381697419ff89029f9f2'  # bot token from environment
+        os.environ.get('BOT_TOKEN')  # bot token from environment
     )
 
-    memePullingThread = Thread(target=sendMemeToSubscribersIfNeeded)
+    memePullingThread = Thread(target=send_meme_to_subscribers_if_needed)
     memePullingThread.start()
 
     lastMemeUrl = ""
 
-    bot.messaging.on_message(checkAndPresentActionsIfNeeded, onActionTap)
+    bot.messaging.on_message(check_and_present_actions_if_needed, on_action_tap)
