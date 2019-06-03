@@ -9,8 +9,8 @@ import requests
 
 kBotNick = '@memobot'
 kPullingTimeInterval = 10
-kSubscribeActionId = 0
-kUnsubscribeActionId = 1
+kSubscribeActionId = "0"
+kUnsubscribeActionId = "1"
 
 memeSubscribers = {}
 lastMemeUrl = ''
@@ -78,7 +78,8 @@ def sendMemeToSubscribersIfNeeded():
         lastMemeUrl = getFreshestMemeRemoteURL()
         downloadAndSaveMemeWith(lastMemeUrl)
         #Calculate subscriber ids
-        onlySubscribed = { k : v for k,v in memeSubscribers if v }
+        print(memeSubscribers)
+        onlySubscribed = { k:v for k,v in memeSubscribers.items() if v }
         subscribersUids = onlySubscribed.keys()
         for uid in subscribersUids:
             sendLastMemeTo(uid)
