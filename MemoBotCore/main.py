@@ -1,5 +1,6 @@
 from dialog_bot_sdk.bot import DialogBot
 from dialog_bot_sdk import interactive_media
+from bs4 import BeautifulSoup
 import grpc
 import os
 import json
@@ -35,10 +36,17 @@ def onActionTap(actionParams):
     bot.messaging.send_image(peer, imagePath)
 
 def getRandomMemeRemoteURL():
-    sourceUrl = 'https://api.memeload.us/v1/random'
-    newMemeResponse = requests.get(sourceUrl)
-    jsonResponse = json.loads(newMemeResponse.content)
-    return jsonResponse['image']
+    # sourceUrl = 'https://api.memeload.us/v1/random'
+    # newMemeResponse = requests.get(sourceUrl)
+    # jsonResponse = json.loads(newMemeResponse.content)
+    # return jsonResponse['image']
+    sourceUrl = 'https://pikabu.ru/tag/Мемы?n=4'
+    response = requests.get(sourceUrl)
+    soup = BeautifulSoup(response.content, "html.parser")
+    firstMemeDiv = soup.findAll("div", {"class": "story-image__content"})[0]
+
+    memeImgAttrsSet = firstMemeDiv.findNext("img")
+    return memeImgAttrsSet.attrs['src']
 
 def downloadFileWith(url):
     response = requests.get(url)
