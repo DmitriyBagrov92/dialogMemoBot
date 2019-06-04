@@ -9,46 +9,54 @@ import json
 import requests
 
 k_bot_nick = '@memobot'
+k_subscribe_here_command = '/start @memobot'
 k_pulling_interval = 30
 k_subscribe_action_id = "0"
 k_unsubscribe_action_id = "1"
 
-meme_subscribers = {}
+meme_subscribers_peers = {}
 local_meme_path = os.getcwd() + '/meme.jpeg'
 
 def send_possible_actions(messageParams):
     print('present possible actions for', messageParams)
-    bot.messaging.send_message(
-        messageParams[0].peer,
-        "Возможные действия:",
-        [interactive_media.InteractiveMediaGroup(
-            [
-                interactive_media.InteractiveMedia(
-                    k_subscribe_action_id,
-                    interactive_media.InteractiveMediaButton("Подписаться на Мемы", "Подписаться на Мемы")
-                ),
-                interactive_media.InteractiveMedia(
-                    k_unsubscribe_action_id,
-                    interactive_media.InteractiveMediaButton("Отписаться", "Отписаться")
-                ),
-            ]
-        )]
-    )
+    # bot.messaging.send_message(
+    #     messageParams[0].peer,
+    #     "Возможные действия:",
+    #     [interactive_media.InteractiveMediaGroup(
+    #         [
+    #             interactive_media.InteractiveMedia(
+    #                 k_subscribe_action_id,
+    #                 interactive_media.InteractiveMediaButton("Подписаться на Мемы", "Подписаться на Мемы")
+    #             ),
+    #             interactive_media.InteractiveMedia(
+    #                 k_unsubscribe_action_id,
+    #                 interactive_media.InteractiveMediaButton("Отписаться", "Отписаться")
+    #             ),
+    #         ]
+    #     )]
+    # )
+    bot.messaging.send_message(messageParams[0].peer, "Для подписки на свежие мемы отправьте /start @memobot")
 
 def check_and_present_actions_if_needed(*message):
     textMessage = message[0].message.textMessage.text
-    if k_bot_nick in textMessage:
+    if k_subscribe_here_command in textMessage:
+        peer = message[0].peer
+        print(dir(peer))
+        meme_subscribers_peers[peer.id] = peer
+        bot.messaging.send_message(peer, "Подписка оформлена успешно")
+        send_last_meme_to(peer)
+    elif k_bot_nick in textMessage:
         send_possible_actions(message)
 
 def on_action_tap(actionParams):
     print('on action tap for', actionParams)
     if actionParams.id == k_subscribe_action_id:
         #TODO: send successfuly subscribed message
-        meme_subscribers[actionParams.uid] = True
+        # meme_subscribers[actionParams.uid] = True
         send_last_meme_to(actionParams.uid)
-    else:
+    # else:
         #TODO: send successfuly unsubscribed message
-        meme_subscribers[actionParams.uid] = False
+        # meme_subscribers[actionParams.uid] = False
 
 def get_freshest_meme_remote_URL():
     sourceUrl = 'https://pikabu.ru/tag/Мемы?n=4'
@@ -68,10 +76,9 @@ def download_and_save_meme_with(url):
     else:
         print("Failed to get the file")
 
-def send_last_meme_to(uid):
-    peer = bot.users.get_user_outpeer_by_id(uid)
+def send_last_meme_to(peer):
     bot.messaging.send_image(peer, local_meme_path)
-    print("Meme sent to subscriber", uid)
+    print("Meme sent to subscriber", peer)
 
 def send_meme_to_subscribers_if_needed():
     print("Checking for new Meme...")
@@ -83,11 +90,11 @@ def send_meme_to_subscribers_if_needed():
             lastMemeUrl = get_freshest_meme_remote_URL()
             download_and_save_meme_with(lastMemeUrl)
             #Calculate subscriber ids
-            print(meme_subscribers)
-            onlySubscribed = { k:v for k,v in meme_subscribers.items() if v }
-            subscribersUids = onlySubscribed.keys()
-            for uid in subscribersUids:
-               send_last_meme_to(uid)
+            print(meme_subscribers_peers)
+            onlySubscribed = { k:v for k,v in meme_subscribers_peers.items() if v is not None }
+            subscribersPeers = onlySubscribed.values()
+            for peer in subscribersPeers:
+               send_last_meme_to(peer)
         else:
             print("New meme is not available=(")
         time.sleep(k_pulling_interval)
